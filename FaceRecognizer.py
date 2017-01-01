@@ -17,7 +17,7 @@ import utils
 MTCNN_PARAMS_DEFAULT = {
 	'minsize': 20,
 	'threshold': [0.6, 0.7, 0.7],
-	'factor': 0.709
+	'factor': 0.8
 }
 
 class FaceDatabase(object):
