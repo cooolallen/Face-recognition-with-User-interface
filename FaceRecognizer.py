@@ -8,6 +8,7 @@ import sys
 import os
 import cv2
 import importlib
+import pickle
 import random #debug
 
 import align.detect_face
@@ -83,9 +84,10 @@ class FaceDatabase(object):
 		return self._n_prototype
 	
 class FaceRecognizer(object):
-	def __init__(self, facenet_model_dir, mtcnn_model_dir, 
-				 match_thresh=0.78,
+	def __init__(self, facenet_model_dir, mtcnn_model_dir,
+				 match_thresh=0.7,
 				 mtcnn_params=MTCNN_PARAMS_DEFAULT,
+				 db_load_path = None,
 				 database_verbose=False,
 				 gpu_memory_fraction=0.4):
 		'''
@@ -95,6 +97,7 @@ class FaceRecognizer(object):
 			match_thresh: the lower bound of a valid match (if distance between 2 embeddings is higher 
 						  than this threshold, then the corresponding 2 faces will be viewed as different)
 			mtcnn_params: Parameters of MTCNN, a dictionary with 3 keys, 'minsize', 'threshold', 'factor'
+			db_load_path: if set, load existed Face database
 			database_verbose: if True, print extra messages as database updates, and vice versa
 			gpu_memory_fraction: Fraction of GPU memory to be queried, in range [0,1]
 		Return:
@@ -119,7 +122,14 @@ class FaceRecognizer(object):
 		self._images_placeholder = []
 		self._embeddings = []
 		# database
-		self._database = FaceDatabase(database_verbose)
+		if db_load_path is not None: # load existing Face database
+			db_load_path = utils.check_path(db_load_path)
+			with open(db_load_path, 'rb') as input:
+				self._database = pickle.load(input)
+			print('Load FaceDatabase from {}'.format(db_load_path))
+			self._database._verbose = database_verbose
+		else: # create new Face database
+			self._database = FaceDatabase(database_verbose)
 		# MTCNN
 		self._pnet = []
 		self._rnet = []
@@ -161,6 +171,9 @@ class FaceRecognizer(object):
 								 unknown faces in current inference 
 		'''
 		############################ face detection ############################
+		# make sure input image is not too large
+		while( image.shape[0]>500 or image.shape[1]>500 ):
+			image = cv2.resize(image, (0,0), fx=0.8, fy=0.8)
 		bounding_boxes, _ = align.detect_face.detect_face(image, self._minsize,
 														  self._pnet, self._rnet, self._onet, 
 														  self._threshold, self._factor)
@@ -177,11 +190,10 @@ class FaceRecognizer(object):
 			cropped_img_cur = utils.prewhiten(cropped_img_cur)
 			# append to list
 			cropped_img.append(cropped_img_cur)
-			# draw rectangle --> debug
-			cv2.rectangle(image,(rect[0],rect[1]),(rect[2],rect[3]),(0,255,0),2)
 		# convert from list to numpy array
 		n_face_found = len(cropped_img)
 		cropped_img = np.stack(cropped_img)
+		print('n_face_found: ',n_face_found)
 
 		############################ feed images to FaceNet ############################
 		feed_dict = { self._images_placeholder: cropped_img }
@@ -213,7 +225,16 @@ class FaceRecognizer(object):
 					self._cur_embs_name[i] = match_identity
 					database_embs = np.array(self._database.embs_pool)
 
-		return bounding_boxes, self._cur_embs_name
+		# visualize, debug
+		font = cv2.FONT_HERSHEY_SIMPLEX
+		for i in range(len(bounding_boxes)):
+			# current bounding box enclosing a face
+			rect = np.array(bounding_boxes[i,0:4]).astype(np.int32)
+			# draw rectangle and put text
+			cv2.rectangle(image,(rect[0],rect[1]+5),(rect[2],rect[3]),(0,255,0),2)
+			cv2.putText(image,self._cur_embs_name[i],(rect[0],rect[1]),font,0.5,(0,0,255),1,cv2.LINE_AA)
+
+		return bounding_boxes, self._cur_embs_name, image
 
 	def add_identity(self, unknown_name, specified_name):
 		'''
@@ -243,6 +264,15 @@ class FaceRecognizer(object):
 		FUNC: return a list of strings --> all identities in the database
 		'''
 		return self._database.identity_list
+
+	def save_database(self, save_path):
+		'''
+		FUNC: save FaceDatabase instance to .npy file with path save_path
+		'''
+		save_path = os.path.abspath(os.path.expanduser(save_path))
+		with open(save_path, 'wb') as output:
+			pickle.dump(self._database, output)
+		print('Save Face database to {}'.format(save_path))
 
 	#FOR DEBUGGING
 	def n_prototype(self):

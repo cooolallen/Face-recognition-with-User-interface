@@ -37,7 +37,7 @@ def check_path(path):
 	FUNC: convert path (can be realtive path or using ~) to absolute path and check
 		  the path exists.
 	'''
-	path = os.path.abspath(path)
+	path = os.path.abspath(os.path.expanduser(path))
 	if not os.path.exists(path):
 		raise NameError('Not such path as %s' % path)
 
@@ -47,7 +47,7 @@ def check_dir(dir_path):
 	'''
 	FUNC: check directory path, if no such directory, then create one
 	'''
-	dir_path = os.path.abspath(dir_path)
+	dir_path = os.path.abspath(os.path.expanduser(dir_path))
 	if not os.path.exists(dir_path):
 		os.makedirs(dir_path)
 	else:
@@ -55,6 +55,7 @@ def check_dir(dir_path):
 			return dir_path
 		else:
 			raise NameError('%s is not a directory' % dir_path)
+	return dir_path
 
 def save_image(img, filename, verbose=False):
 	'''
@@ -77,3 +78,15 @@ def print_all_vars_on_graph(graph):
 def print_all_on_graph(graph):
 	for n in graph.as_graph_def().node:
 		print(n.name)
+
+def parse_img_dir(image_dir):
+	img_name_dict = {}
+	img_name_dict['image'] = []
+	img_name_dict['name'] = []
+	for idx, f in enumerate(os.listdir(image_dir)):
+		if not f.startswith('.'):
+			name = f.split('_')[0]
+			img_name_dict['image'].append(f)
+			img_name_dict['name'].append(name)
+
+	return img_name_dict

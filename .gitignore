@@ -3,6 +3,7 @@ test_compare.sh
 *.jpg
 *.jpeg
 *.png
+*.JPG
 log.txt
 log2.txt
 compare.py
@@ -16,3 +17,5 @@ models/nn4.py
 models/nn4_small2_v1.py
 facenet.py
 facenet_full.py
+test.pkl
+test_johnson.pkl
