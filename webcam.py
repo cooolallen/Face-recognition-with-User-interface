@@ -10,9 +10,11 @@ import numpy as np
 
 from ui_AddDialog import Ui_AddDialog
 from ui_Table import Ui_Table
-from dictionary import Database as db
+#from dictionary import Database as db
+from FaceRecognizer import *
 
-global data, nameList, features, tableDialog
+
+global FR,tableDialog,db_load_path
 
 class Table(widgets.QDialog):
     def __init__(self,parent=None):
@@ -27,8 +29,10 @@ class Table(widgets.QDialog):
         self.ui.RemoveButton.clicked.connect(self.removeName)
 
     def buildTable(self):
-        nameList = data.name_list()
-        name_sz = data.num_in_dict()
+        nameList = FR._database.identity_list
+        name_sz = FR._database.n_identity
+
+        self.ui.TableHolder.cellChanged.disconnect(self.nameEdit)
 
         self.ui.TableHolder.clear()
         self.ui.TableHolder.setColumnCount(2)
@@ -50,23 +54,25 @@ class Table(widgets.QDialog):
 
         self.ui.TableHolder.cellChanged.connect(self.nameEdit)
 
-    def nameEdit(self,x,y):
+    def nameEdit(self,x,y):#??????
         # Edit Cell
         name = self.ui.TableHolder.item(x,y).text()
-        data.edit(x,name)
+        # data.edit(x,name)
 
     def removeName(self):
         test = widgets.QTableWidget()
         test.currentRow()
         cR = self.ui.TableHolder.currentRow()
+        del_name = self.ui.TableHolder.item(cR,1).text()
         print('CR =',cR)
         if cR >=0:
-            data.del_one(cR)
+            FR.remove_identity(del_name)
+            # data.del_one(cR)
             self.buildTable()
         else:
             widgets.QMessageBox.warning(self, 'None Select Any Row', "You did't select any row\nData Update Failed!!")
 class AddDialog(widgets.QDialog):
-    def __init__(self, frame, parent=None):
+    def __init__(self, frame, unknown_name, parent=None):
         super(AddDialog, self).__init__(parent)
         self.ui = Ui_AddDialog()
         self.ui.setupUi(self)
@@ -86,21 +92,26 @@ class AddDialog(widgets.QDialog):
         self.ui.pictureHolder.setScaledContents(True)
         self.ui.pictureHolder.setPixmap(QPixmap.fromImage(QI))
 
-    def ADialogAccept(self):
+    def ADialogAccept(self,unknown_name):
         print('accept and do something')
         # self.ui.lineEdit.setText('gggggg')
-        message = self.ui.lineEdit.text()
-        print(message)
+        newName = self.ui.lineEdit.text()
+        print(newName)
         #Prevent Stupid Error
-        if message=='':
+        if newName=='':
             widgets.QMessageBox.warning(self,'Empty Warning','You did not enter anything!!!\nData Update Failed!!')
         else:
             print('saving new data')
             # Save message and feature in database.
-            # Reload data
-            data.add_one(message,np.array([23234,34,32344]))
+
+            FR.add_identity(unknown_name,newName)
+
+            #Dump database
+            FR.save_database(db_load_path)
+            # data.add_one(message,np.array([23234,34,32344]))
 
             # Trigger TableHolder to update
+            # Reload data
             tableDialog.buildTable()
 
 
@@ -116,8 +127,8 @@ def clickEvent(event,x,y,flags,param):
         # print('x=',ix,'y=',iy,'flags=',flags)
 
 
-def frameCropper(frame,faces,chosen):
-    x,y,w,h = faces[chosen]
+def frameCropper(frame,bb):
+    x,y,w,h = bb
     frame_crop = frame[y:y+h,x:x+w]
 
     print("frame = ",type(frame))
@@ -134,44 +145,60 @@ if __name__ == "__main__":
     import sys
     app = widgets.QApplication(sys.argv)
 
-    data = db()
-    nameList = data.name_list()
-    features = data.feat_list()
-    tableDialog = Table()
+
 
     # Face Detection
-    cascPath = 'haarcascade_frontalface_default.xml'
-    faceCascade = cv2.CascadeClassifier(cascPath)
+    # cascPath = 'haarcascade_frontalface_default.xml'
+    # faceCascade = cv2.CascadeClassifier(cascPath)
 
     video_capture = cv2.VideoCapture(0)
 
-    cv2.namedWindow('Video')
-    cv2.setMouseCallback('Video', clickEvent)
+
+    facenet_model_dir = './pretrained_models/FaceNet/'
+    mtcnn_model_dir = './pretrained_models/MTCNN/'
+    database_verbose = False
+    db_load_path = 'test_johnson.pkl'
+
+    FR = FaceRecognizer(facenet_model_dir,
+                        mtcnn_model_dir,
+                        db_load_path=db_load_path,
+                        database_verbose=database_verbose)
+    # Build the model
+    tic = time.clock()
+    FR.build()
+    toc = time.clock()
+    build_time = toc - tic
+    print('build time: {}'.format(build_time))
+    cv2.namedWindow('Camera', cv2.WINDOW_NORMAL)
+    cv2.setMouseCallback('Camera', clickEvent)
+
+    tableDialog = Table()
+
+
+
 
     while True:
         # Capture frame-by-frame, (height,width) = 720,1280
         ret, frame = video_capture.read()
 
-        frame = cv2.resize(frame,(640,360))
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        # inference
+        tic = time.clock()
+        bb, bb_names, image = FR.inference(frame)
+        toc = time.clock()
 
-        faces = faceCascade.detectMultiScale(
-            gray,
-            scaleFactor=1.1,
-            minNeighbors=5,
-            minSize=(30, 30),
-            flags=cv2.CASCADE_SCALE_IMAGE
-        )
-        # print(faces.shape)
-        # Draw a rectangle around the faces
+        print('{}'.format(toc - tic))
+
+        print('bb_names', bb_names)
+
+        print('\n\n')
+
+##################################
+        # box clicked detection
         cond = False
-        # nameList = {0:"Allen1",1:"Allen2"}
-
-
-        for box_ind,(x, y, w, h) in enumerate(faces):
-            cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        for box_ind,(x, y, w, h) in enumerate(bb):
+            # cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
             # cv.PutText(img, text, org, font, color) -> None
-            cv2.putText(frame,nameList[box_ind],(x+w,y+h),cv2.FONT_HERSHEY_SCRIPT_SIMPLEX,2,(0, 0, 255),3,8)
+            # cv2.putText(frame,bb_names[box_ind],(x+w,y+h),cv2.FONT_HERSHEY_SCRIPT_SIMPLEX,2,(0, 0, 255),3,8)
 
             if (ix >= x and ix <= x + w):
                 if (iy >= y and iy <= y + h):
@@ -184,13 +211,13 @@ if __name__ == "__main__":
             ix = -1
             iy = -1
             if cond:
-                addDialog = AddDialog(frameCropper(frame,faces,chosen_ind))
-                # addDialog = AddDialog(frame)
+                if 'unknown' is in bb_names[chosen_ind]:#Unknown or not
+                    addDialog = AddDialog(frameCropper(image,bb[chosen_ind]),bb_names[chosen_ind])
             else:
                 print("out")
-
+##########################
         # Display the resulting frame
-        cv2.imshow('Video', frame)
+        cv2.imshow('Video', image)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
