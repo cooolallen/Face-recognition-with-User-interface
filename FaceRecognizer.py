@@ -17,7 +17,7 @@ import utils
 MTCNN_PARAMS_DEFAULT = {
 	'minsize': 20,
 	'threshold': [0.6, 0.7, 0.7],
-	'factor': 0.8
+	'factor': 0.8 #0.709
 }
 
 class FaceDatabase(object):
@@ -67,6 +67,16 @@ class FaceDatabase(object):
 			if self._verbose:
 				print('Add a new prototype to existing identity "{}"'.format(name))
 
+	def rename(self, old_name, new_name):
+		try:
+			# edit identity list
+			name_idx = self._identity_list.index(old_name)
+			self._identity_list[name_idx] = new_name
+			# no need to edit embeds_pool_name since embeds_pool_name fetch
+			# name according to index over identity list
+		except ValueError:
+			print('No name {} in database. Cannot edit to {}'.format(old_name, new_name))
+
 	@property
 	def embs_pool(self):
 		return self._embs_pool
@@ -85,6 +95,7 @@ class FaceDatabase(object):
 	
 class FaceRecognizer(object):
 	def __init__(self, facenet_model_dir, mtcnn_model_dir,
+				 resize_factor=0.7,
 				 match_thresh=0.7,
 				 mtcnn_params=MTCNN_PARAMS_DEFAULT,
 				 db_load_path = None,
@@ -94,6 +105,7 @@ class FaceRecognizer(object):
 		Arguments:
 			facenet_model_dir: Directory containing the FaceNet model, with meta-file and ckpt-file
 			mtcnn_model_dir: Directory containing MTCNN model, det1.npy, det2.npy, det3.npy
+			resize_factor: input image will be resize to a smaller size before sent into MTCNN and FaceNet
 			match_thresh: the lower bound of a valid match (if distance between 2 embeddings is higher 
 						  than this threshold, then the corresponding 2 faces will be viewed as different)
 			mtcnn_params: Parameters of MTCNN, a dictionary with 3 keys, 'minsize', 'threshold', 'factor'
@@ -109,6 +121,7 @@ class FaceRecognizer(object):
 		self._threshold = mtcnn_params['threshold']
 		self._factor = mtcnn_params['factor']
 		self._match_thresh = match_thresh
+		self._resize_factor = resize_factor
 		
 		# define graph to be built on
 		self._graph = tf.Graph()
@@ -171,17 +184,20 @@ class FaceRecognizer(object):
 								 unknown faces in current inference 
 		'''
 		############################ face detection ############################
-		# make sure input image is not too large
-		while( image.shape[0]>500 or image.shape[1]>500 ):
-			image = cv2.resize(image, (0,0), fx=0.8, fy=0.8)
-		bounding_boxes, _ = align.detect_face.detect_face(image, self._minsize,
+		# resize to a smaller image and make sure iresized image is not too large
+		image_resized = cv2.resize(image, (0,0), fx=self._resize_factor, fy=self._resize_factor)
+		# MTCNN
+		bounding_boxes, _ = align.detect_face.detect_face(image_resized, self._minsize,
 														  self._pnet, self._rnet, self._onet, 
 														  self._threshold, self._factor)
+		# resize bounding box to original resolution
+		bounding_boxes = np.array(bounding_boxes)
+		bounding_boxes = (bounding_boxes/self._resize_factor).astype(np.int32)
 		# crop image according to bounding boxes, with each cropped image as a face
 		cropped_img = []
 		for i in range(len(bounding_boxes)):
 			# current bounding box enclosing a face
-			rect = np.array(bounding_boxes[i,0:4]).astype(np.int32)
+			rect = bounding_boxes[i,0:4].astype(np.int32)
 			# crop image
 			cropped_img_cur = image[rect[1]:rect[3], rect[0]:rect[2], :]
 			# resize images to 160x160
@@ -192,8 +208,11 @@ class FaceRecognizer(object):
 			cropped_img.append(cropped_img_cur)
 		# convert from list to numpy array
 		n_face_found = len(cropped_img)
+		print('n_face_found: ',n_face_found) #debug
+		if n_face_found==0:
+			print('No face is found')
+			return None, None, image
 		cropped_img = np.stack(cropped_img)
-		print('n_face_found: ',n_face_found)
 
 		############################ feed images to FaceNet ############################
 		feed_dict = { self._images_placeholder: cropped_img }
@@ -205,12 +224,12 @@ class FaceRecognizer(object):
 			self._cur_embs_name.append('Unknown'+str(i))
 
 		############################ matching ############################
-		database_embs = np.array(self._database.embs_pool)
 		if self._database.n_identity!=0:
 			for i in xrange(n_face_found):
 				# compute distance between current face embeddings and all embeddings in database
+				# remember self._database.embs_pool is a list and needed to be convert to ndarray
 				rep_cur_embs = np.tile(self._cur_embs[i],(self._database.n_prototype,1))
-				dist_mat = np.linalg.norm(rep_cur_embs-database_embs, axis=1) # Euclidean distance
+				dist_mat = np.linalg.norm(rep_cur_embs-np.array(self._database.embs_pool), axis=1) # Euclidean distance
 				# find the best match (with the smallest distance)
 				min_val = np.amin(dist_mat, axis=0)
 				min_idx = np.argmin(dist_mat, axis=0)
@@ -220,27 +239,26 @@ class FaceRecognizer(object):
 					id_idx = self._database.embs_pool_name[min_idx]
 					match_identity = self._database.identity_list[id_idx]
 					# also add this detected but recognized embeddings to database
-					self.add_identity(self._cur_embs_name[i], match_identity)
+					self.add_identity_at_current_inference(self._cur_embs_name[i], match_identity)
 					# also update current name list and database_embs used now
 					self._cur_embs_name[i] = match_identity
-					database_embs = np.array(self._database.embs_pool)
 
-		# visualize, debug
+		############################ draw for visualization ############################
 		font = cv2.FONT_HERSHEY_SIMPLEX
 		for i in range(len(bounding_boxes)):
 			# current bounding box enclosing a face
 			rect = np.array(bounding_boxes[i,0:4]).astype(np.int32)
 			# draw rectangle and put text
-			cv2.rectangle(image,(rect[0],rect[1]+5),(rect[2],rect[3]),(0,255,0),2)
-			cv2.putText(image,self._cur_embs_name[i],(rect[0],rect[1]),font,0.5,(0,0,255),1,cv2.LINE_AA)
+			cv2.rectangle(image,(rect[0],rect[1]),(rect[2],rect[3]),(0,255,0),2)
+			cv2.putText(image,self._cur_embs_name[i],(rect[0],rect[1]+5),font,0.5,(0,0,255),1,cv2.LINE_AA)
 
 		return bounding_boxes, self._cur_embs_name, image
 
-	def add_identity(self, unknown_name, specified_name):
+	def add_identity_at_current_inference(self, unknown_name, specified_name):
 		'''
-		FUNC: add new identity. i.e. save the embedding specified by unknown_name
-			  to the database and give it a name, specified_name, and afterward, the
-			  embedding has a recognized identity.
+		FUNC: add a new identity at current inference. i.e. save the embedding specified 
+			  by unknown_name to the database and give it a name, specified_name, and 
+			  afterward, the embedding has a recognized identity.
 		Arguments:
 			unknown_name: a string, should be an unknown name obtained from 
 						  current inference, e.g. 'Unknown_0' 
@@ -252,6 +270,22 @@ class FaceRecognizer(object):
 			self._database.add(specified_name, self._cur_embs[name_idx])
 		except:
 			print('Embedding of unknown name "{}" to be added is not in current frame'.format(unknown_name))
+
+	def add_identity(self, specified_name, embs):
+		'''
+		FUNC: add a new identity to database (not restricted to detection at current inference)
+		Arguments:
+			specified_name: a string, name of the identity to be added to the database
+			embs: corresponding embedding of the specified name
+		'''
+		# DOES NOT check whether the embeddings is valid 
+		self._database.add(specified_name, embs)
+
+	def rename_identity(self, old_name, new_name):
+		'''
+		FUNC: change the identity with old_name to new_name
+		'''
+		self._database.rename(old_name, new_name)
 
 	def remove_identity(self, name):
 		'''
@@ -277,13 +311,3 @@ class FaceRecognizer(object):
 	#FOR DEBUGGING
 	def n_prototype(self):
 		return self._database.n_prototype
-
-
-
-# # build FaceNet graph and load parameters --> bad method
-		# meta_file, ckpt_file = utils.get_model_filenames(self._facenet_model_dir)
-		# print('Load FaceNet Metargaph file: {}'.format(meta_file))
-		# print('Load FaceNet Checkpoint file: {}'.format(ckpt_file))
-		# self._graph = utils.load_model(self._facenet_model_dir, self._sess, meta_file, ckpt_file)
-		# self._images_placeholder = self._graph.get_tensor_by_name('input:0')
-		# self._embeddings = self._graph.get_tensor_by_name('embeddings:0')

@@ -19,7 +19,7 @@ db_load_path = None
 database_save_path = 'test_johnson.pkl'
 image_dir = os.path.abspath(os.path.expanduser(image_dir))
 image_name_dict = utils.parse_img_dir(image_dir)
-# print(image_name_dict)
+print(image_name_dict)
 # print(len(image_name_dict['image']))
 # sys.exit()
 
@@ -47,7 +47,11 @@ for i in range(len(image_name_dict['image'])):
 
 	print('bb_names',bb_names)
 
-	FR.add_identity(bb_names[0],image_name_dict['name'][i]) #update database
+	if bb_names is not None:
+		if len(bb_names)==1:
+			FR.add_identity_at_current_inference(bb_names[0],image_name_dict['name'][i]) #update database
+		else:
+			print('To build database, number of faces per image should be 1')
 
 	print('\n\n')
 

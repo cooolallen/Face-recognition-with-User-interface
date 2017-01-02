@@ -79,7 +79,7 @@ import utils
 # 	toc = time.clock()
 # 	print('{}: {}'.format(image_name, toc-tic))
 
-# 	FR.add_identity(bb_names[0],'hi'+str(i%3))
+# 	FR.add_identity_at_current_inference(bb_names[0],'hi'+str(i%3))
 # 	if i%4==0:
 # 		FR.remove_identity('hi2')
 
@@ -124,7 +124,7 @@ import utils
 # 	print('bb_names',bb_names)
 
 # 	if i<len(image_list):
-# 		FR.add_identity(bb_names[0],'hi'+str(i))
+# 		FR.add_identity_at_current_inference(bb_names[0],'hi'+str(i))
 
 # 	print('\n\n')
 
@@ -174,7 +174,7 @@ import utils
 
 # 	print('bb_names',bb_names)
 
-# 	FR.add_identity(bb_names[0],image_name_dict['name'][i]) #update database
+# 	FR.add_identity_at_current_inference(bb_names[0],image_name_dict['name'][i]) #update database
 
 # 	print('\n\n')
 
@@ -208,6 +208,8 @@ FR.build()
 toc = time.clock()
 build_time = toc - tic
 print('build time: {}'.format(build_time))
+
+FR.rename_identity('YC','BurBurBur')
 
 cv2.namedWindow('image', cv2.WINDOW_NORMAL)
 for i, image_name in enumerate(image_list):
