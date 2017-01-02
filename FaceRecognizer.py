@@ -254,6 +254,12 @@ class FaceRecognizer(object):
 
 		return bounding_boxes, self._cur_embs_name, image
 
+	def get_current_embeddings(self):
+		'''
+		FUNC: return all detected embeddings at current inference
+		'''
+		return np.array(self._cur_embs)
+
 	def add_identity_at_current_inference(self, unknown_name, specified_name):
 		'''
 		FUNC: add a new identity at current inference. i.e. save the embedding specified 
