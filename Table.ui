@@ -14,7 +14,9 @@
    <string>Dialog</string>
   </property>
   <property name="styleSheet">
-   <string notr="true">background:qlineargradient(spread:pad, x1:0, y1:0.017, x2:1, y2:1, stop:0 rgba(0, 212, 93, 202), stop:1 rgba(255, 255, 255, 255))</string>
+   <string notr="true">Table{
+background:url(./figures/background.jpg);
+}</string>
   </property>
   <layout class="QGridLayout" name="gridLayout_2">
    <item row="0" column="0">

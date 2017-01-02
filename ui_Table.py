@@ -12,7 +12,9 @@ class Ui_Table(object):
     def setupUi(self, Table):
         Table.setObjectName("Table")
         Table.resize(334, 264)
-        Table.setStyleSheet("background:qlineargradient(spread:pad, x1:0, y1:0.017, x2:1, y2:1, stop:0 rgba(0, 212, 93, 202), stop:1 rgba(255, 255, 255, 255))")
+        Table.setStyleSheet("Table{\n"
+"background:url(./figures/background.jpg);\n"
+"}")
         self.gridLayout_2 = QtWidgets.QGridLayout(Table)
         self.gridLayout_2.setObjectName("gridLayout_2")
         self.gridLayout = QtWidgets.QGridLayout()

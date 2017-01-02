@@ -12,6 +12,9 @@ class Ui_AddDialog(object):
     def setupUi(self, AddDialog):
         AddDialog.setObjectName("AddDialog")
         AddDialog.resize(274, 310)
+        AddDialog.setStyleSheet("AddDialog{\n"
+"background:url(./figures/background.jpg);\n"
+"}")
         self.gridLayout = QtWidgets.QGridLayout(AddDialog)
         self.gridLayout.setObjectName("gridLayout")
         self.verticalLayout = QtWidgets.QVBoxLayout()

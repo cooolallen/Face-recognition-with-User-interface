@@ -36,6 +36,8 @@ class Table(widgets.QDialog):
 
         self.ui.TableHolder.clear()
         self.ui.TableHolder.setColumnCount(2)
+        self.ui.TableHolder.setHorizontalHeaderItem(0, widgets.QTableWidgetItem("Index"))
+        self.ui.TableHolder.setHorizontalHeaderItem(1, widgets.QTableWidgetItem("Name"))
         self.ui.TableHolder.setColumnWidth(0, 50)
         self.ui.TableHolder.setColumnWidth(1, 120)
         self.ui.TableHolder.setRowCount(name_sz)
@@ -54,10 +56,18 @@ class Table(widgets.QDialog):
 
         self.ui.TableHolder.cellChanged.connect(self.nameEdit)
 
-    def nameEdit(self,x,y):#??????
+    def nameEdit(self,x,y):
         # Edit Cell
-        name = self.ui.TableHolder.item(x,y).text()
+        nameList = FR._database.identity_list
+
+        new_name = self.ui.TableHolder.item(x,y).text()
         # data.edit(x,name)
+        if new_name=="":
+            self.ui.TableHolder.item(x,y).setText(nameList[x])
+        else:
+            FR.rename_identity(nameList[x],new_name)
+            FR.save_database(db_load_path)
+            self.buildTable()
 
     def removeName(self):
         test = widgets.QTableWidget()
@@ -67,18 +77,20 @@ class Table(widgets.QDialog):
         print('CR =',cR)
         if cR >=0:
             FR.remove_identity(del_name)
-            # data.del_one(cR)
+            FR.save_database(db_load_path)
             self.buildTable()
         else:
             widgets.QMessageBox.warning(self, 'None Select Any Row', "You did't select any row\nData Update Failed!!")
+
 class AddDialog(widgets.QDialog):
-    def __init__(self, frame, unknown_name, parent=None):
+    def __init__(self, frame,embs, parent=None):
         super(AddDialog, self).__init__(parent)
         self.ui = Ui_AddDialog()
         self.ui.setupUi(self)
         self.setPicture(frame)
         self.accepted.connect(self.ADialogAccept)
         self.setWindowTitle('Add New Identity')
+        self.current_embs = embs
         self.show()
 
     def setPicture(self, frame):
@@ -92,7 +104,7 @@ class AddDialog(widgets.QDialog):
         self.ui.pictureHolder.setScaledContents(True)
         self.ui.pictureHolder.setPixmap(QPixmap.fromImage(QI))
 
-    def ADialogAccept(self,unknown_name):
+    def ADialogAccept(self):
         print('accept and do something')
         # self.ui.lineEdit.setText('gggggg')
         newName = self.ui.lineEdit.text()
@@ -104,7 +116,7 @@ class AddDialog(widgets.QDialog):
             print('saving new data')
             # Save message and feature in database.
 
-            FR.add_identity(unknown_name,newName)
+            FR.add_identity(newName,self.current_embs)
 
             #Dump database
             FR.save_database(db_load_path)
@@ -171,7 +183,7 @@ if __name__ == "__main__":
     print('build time: {}'.format(build_time))
     cv2.namedWindow('Camera', cv2.WINDOW_NORMAL)
     cv2.setMouseCallback('Camera', clickEvent)
-
+    cv2.moveWindow('Camera', 0, 0)
     tableDialog = Table()
 
 
@@ -212,7 +224,7 @@ if __name__ == "__main__":
             iy = -1
             if cond:
                 if 'unknown' is in bb_names[chosen_ind]:#Unknown or not
-                    addDialog = AddDialog(frameCropper(image,bb[chosen_ind]),bb_names[chosen_ind])
+                    addDialog = AddDialog(frameCropper(image,bb[chosen_ind]),FR.get_current_embeddings()[chosen_ind])
             else:
                 print("out")
 ##########################
