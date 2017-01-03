@@ -14,7 +14,7 @@ from ui_Table import Ui_Table
 from FaceRecognizer import *
 
 
-global FR,tableDialog,db_load_path
+global FR,tableDialog,db_save_path
 
 class Table(widgets.QDialog):
     def __init__(self,parent=None):
@@ -29,11 +29,13 @@ class Table(widgets.QDialog):
         self.ui.RemoveButton.clicked.connect(self.removeName)
 
     def buildTable(self):
-        nameList = FR._database.identity_list
-        name_sz = FR._database.n_identity
-
-        self.ui.TableHolder.cellChanged.disconnect(self.nameEdit)
-
+        nameList = FR.list_database()
+        print('nameList', nameList)
+        name_sz = len(nameList)
+        try:
+            self.ui.TableHolder.cellChanged.disconnect(self.nameEdit)
+        except:
+            pass
         self.ui.TableHolder.clear()
         self.ui.TableHolder.setColumnCount(2)
         self.ui.TableHolder.setHorizontalHeaderItem(0, widgets.QTableWidgetItem("Index"))
@@ -119,7 +121,7 @@ class AddDialog(widgets.QDialog):
             FR.add_identity(newName,self.current_embs)
 
             #Dump database
-            FR.save_database(db_load_path)
+            FR.save_database(db_save_path)
             # data.add_one(message,np.array([23234,34,32344]))
 
             # Trigger TableHolder to update
@@ -140,8 +142,9 @@ def clickEvent(event,x,y,flags,param):
 
 
 def frameCropper(frame,bb):
-    x,y,w,h = bb
-    frame_crop = frame[y:y+h,x:x+w]
+    x,y,w,h = bb[0:4]
+    x = int(x); y = int(y); w = int(w); h = int(h)
+    frame_crop = frame[y:h,x:w]
 
     print("frame = ",type(frame))
     print("frame_crop = ",type(frame_crop))
@@ -165,16 +168,19 @@ if __name__ == "__main__":
 
     video_capture = cv2.VideoCapture(0)
 
+    video_capture.set(3,1280)
+    video_capture.set(4,720)
 
     facenet_model_dir = './pretrained_models/FaceNet/'
     mtcnn_model_dir = './pretrained_models/MTCNN/'
     database_verbose = False
-    db_load_path = 'test_johnson.pkl'
-
+    db_load_path = './data/database/database.pkl'
+    db_save_path = './data/database/database.pkl'
     FR = FaceRecognizer(facenet_model_dir,
                         mtcnn_model_dir,
                         db_load_path=db_load_path,
-                        database_verbose=database_verbose)
+                        database_verbose=database_verbose,
+                        resize_factor = 0.2)
     # Build the model
     tic = time.clock()
     FR.build()
@@ -192,44 +198,46 @@ if __name__ == "__main__":
     while True:
         # Capture frame-by-frame, (height,width) = 720,1280
         ret, frame = video_capture.read()
-
         # inference
         tic = time.clock()
         bb, bb_names, image = FR.inference(frame)
+        cur_embeds = FR.get_current_embeddings()
+        
         toc = time.clock()
 
         print('{}'.format(toc - tic))
 
-        print('bb_names', bb_names)
-
-        print('\n\n')
+#        print(FR.list_database())
 
 ##################################
         # box clicked detection
         cond = False
-        for box_ind,(x, y, w, h) in enumerate(bb):
+        if bb is not None:
+            for box_ind, shit in enumerate(bb):
+                x, y, w, h  = shit[0:4]
             # cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
             # cv.PutText(img, text, org, font, color) -> None
             # cv2.putText(frame,bb_names[box_ind],(x+w,y+h),cv2.FONT_HERSHEY_SCRIPT_SIMPLEX,2,(0, 0, 255),3,8)
 
-            if (ix >= x and ix <= x + w):
-                if (iy >= y and iy <= y + h):
-                    cond = True
-                    chosen_ind = box_ind
+                if (ix >= x and ix <= w):
+                    if (iy >= y and iy <= h):
+                        cond = True
+                        chosen_ind = box_ind
 
 
-        if (click_state):
-            click_state = False
-            ix = -1
-            iy = -1
-            if cond:
-                if 'unknown' is in bb_names[chosen_ind]:#Unknown or not
-                    addDialog = AddDialog(frameCropper(image,bb[chosen_ind]),FR.get_current_embeddings()[chosen_ind])
-            else:
-                print("out")
+            if (click_state):
+                click_state = False
+                ix = -1
+                iy = -1
+                if cond:
+#                    print('in')
+                    addDialog = AddDialog(frameCropper(image,bb[chosen_ind]), cur_embeds[chosen_ind,:])
+                else:
+                    pass
+#                    print("out")
 ##########################
         # Display the resulting frame
-        cv2.imshow('Video', image)
+        cv2.imshow('Camera', image)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

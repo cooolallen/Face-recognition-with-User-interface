@@ -137,8 +137,8 @@ class FaceRecognizer(object):
 		# database
 		if db_load_path is not None: # load existing Face database
 			db_load_path = utils.check_path(db_load_path)
-			with open(db_load_path, 'rb') as input:
-				self._database = pickle.load(input)
+			with open(db_load_path, 'rb') as handle:
+				self._database = pickle.load(handle)
 			print('Load FaceDatabase from {}'.format(db_load_path))
 			self._database._verbose = database_verbose
 		else: # create new Face database
@@ -184,6 +184,7 @@ class FaceRecognizer(object):
 								 unknown faces in current inference 
 		'''
 		############################ face detection ############################
+		img_h, img_w = image.shape[0:2]
 		# resize to a smaller image and make sure iresized image is not too large
 		image_resized = cv2.resize(image, (0,0), fx=self._resize_factor, fy=self._resize_factor)
 		# MTCNN
@@ -193,6 +194,10 @@ class FaceRecognizer(object):
 		# resize bounding box to original resolution
 		bounding_boxes = np.array(bounding_boxes)
 		bounding_boxes = (bounding_boxes/self._resize_factor).astype(np.int32)
+		bounding_boxes[:,0:2] = np.maximum(bounding_boxes[:,0:2],0)
+		bounding_boxes[:,2] = np.minimum(bounding_boxes[:,2], img_w)
+		bounding_boxes[:,3] = np.minimum(bounding_boxes[:,3], img_h)
+		
 		# crop image according to bounding boxes, with each cropped image as a face
 		cropped_img = []
 		for i in range(len(bounding_boxes)):
@@ -200,6 +205,8 @@ class FaceRecognizer(object):
 			rect = bounding_boxes[i,0:4].astype(np.int32)
 			# crop image
 			cropped_img_cur = image[rect[1]:rect[3], rect[0]:rect[2], :]
+			if((cropped_img_cur.shape[0]) == 0 or (cropped_img_cur.shape[1]) == 0):
+				continue
 			# resize images to 160x160
 			cropped_img_cur = cv2.resize(cropped_img_cur, (160,160))
 			# prewhiten image before sent to FaceNet
@@ -219,13 +226,13 @@ class FaceRecognizer(object):
 		self._cur_embs = self._sess.run(self._embeddings, feed_dict=feed_dict)
 		# self._cur_embs = [] #debug
 		self._cur_embs_name = []
-		for i in xrange(n_face_found):
+		for i in range(n_face_found):
 			# self._cur_embs.append(np.array([random.random(),random.random(),random.random()])) #debug
 			self._cur_embs_name.append('Unknown'+str(i))
 
 		############################ matching ############################
 		if self._database.n_identity!=0:
-			for i in xrange(n_face_found):
+			for i in range(n_face_found):
 				# compute distance between current face embeddings and all embeddings in database
 				# remember self._database.embs_pool is a list and needed to be convert to ndarray
 				rep_cur_embs = np.tile(self._cur_embs[i],(self._database.n_prototype,1))
@@ -235,25 +242,34 @@ class FaceRecognizer(object):
 				min_idx = np.argmin(dist_mat, axis=0)
 				# check if the best match good enough (below a threshold)
 				if min_val<=self._match_thresh:
-					# if good enough, match the detected face with corresponding identity in database
-					id_idx = self._database.embs_pool_name[min_idx]
-					match_identity = self._database.identity_list[id_idx]
-					# also add this detected but recognized embeddings to database
-					self.add_identity_at_current_inference(self._cur_embs_name[i], match_identity)
-					# also update current name list and database_embs used now
-					self._cur_embs_name[i] = match_identity
-
+					try:
+						# if good enough, match the detected face with corresponding identity in database
+						id_idx = self._database.embs_pool_name[min_idx]
+						
+						match_identity = self._database.identity_list[id_idx]
+						# also add this detected but recognized embeddings to database
+						#self.add_identity_at_current_inference(self._cur_embs_name[i], match_identity)
+						# also update current name list and database_embs used now
+						self._cur_embs_name[i] = match_identity
+					except:
+						pass
 		############################ draw for visualization ############################
 		font = cv2.FONT_HERSHEY_SIMPLEX
 		for i in range(len(bounding_boxes)):
+			flag_j = not ( all(bounding_boxes[i][2:4]) )#or (rect[0]>=0 and rect[0]<img_w) or (rect[1]>=0 and rect[1]<img_h) )
+			if flag_j:
+				continue
 			# current bounding box enclosing a face
 			rect = np.array(bounding_boxes[i,0:4]).astype(np.int32)
 			# draw rectangle and put text
 			cv2.rectangle(image,(rect[0],rect[1]),(rect[2],rect[3]),(0,255,0),2)
-			cv2.putText(image,self._cur_embs_name[i],(rect[0],rect[1]+5),font,0.5,(0,0,255),1,cv2.LINE_AA)
+			cv2.putText(image,self._cur_embs_name[i],(rect[0],rect[1]),font,0.5,(0,0,255),1,cv2.LINE_AA)
 
 		return bounding_boxes, self._cur_embs_name, image
-
+	
+	def get_embeddings(self):
+		return self._database.embs_pool, self._database.embs_pool_name
+	
 	def get_current_embeddings(self):
 		'''
 		FUNC: return all detected embeddings at current inference
