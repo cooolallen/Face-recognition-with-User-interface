@@ -151,7 +151,7 @@ def frameCropper(frame,bb):
     frame_crop.astype('uint8')
     # frame_crop = frame
 
-    frame_crop = cv2.resize(frame_crop,(w,h))
+    frame_crop = cv2.resize(frame_crop,(160,160))
     print(type(frame_crop))
     return frame_crop
 

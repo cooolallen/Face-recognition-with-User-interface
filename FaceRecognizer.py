@@ -254,7 +254,7 @@ class FaceRecognizer(object):
 					except:
 						pass
 		############################ draw for visualization ############################
-		font = cv2.FONT_HERSHEY_SIMPLEX
+		font = cv2.FONT_HERSHEY_SCRIPT_SIMPLEX
 		for i in range(len(bounding_boxes)):
 			flag_j = not ( all(bounding_boxes[i][2:4]) )#or (rect[0]>=0 and rect[0]<img_w) or (rect[1]>=0 and rect[1]<img_h) )
 			if flag_j:
@@ -263,7 +263,7 @@ class FaceRecognizer(object):
 			rect = np.array(bounding_boxes[i,0:4]).astype(np.int32)
 			# draw rectangle and put text
 			cv2.rectangle(image,(rect[0],rect[1]),(rect[2],rect[3]),(0,255,0),2)
-			cv2.putText(image,self._cur_embs_name[i],(rect[0],rect[1]),font,0.5,(0,0,255),1,cv2.LINE_AA)
+			cv2.putText(image,self._cur_embs_name[i],(rect[0],rect[1]),font,2.5,(0,0,255),3,8)
 
 		return bounding_boxes, self._cur_embs_name, image
 	
