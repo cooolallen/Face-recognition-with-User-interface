@@ -1,7 +1,9 @@
-# Face recognition with user interface
+# Face recognition with User interface
 
 In this project, we use [learning based model][6] to extract face features and to recognize who you are. Also, we create an elegant user interface in order to provide a good user experience. By interacting  with our UI, you can add/remove your face in our database.
 
+Block Diagram
+![Imgur](http://i.imgur.com/Urrf7Hh.png)
 
 
 ## Requirements
@@ -11,6 +13,7 @@ In this project, we use [learning based model][6] to extract face features and t
 - [OpenCV][3] 
 
 ## Pretrained-Model
+- [FaceNet][4]
 
 Please download FaceNet pretrained model from [here](https://drive.google.com/file/d/0B5MzpY9kBtDVSTgxX25ZQzNTMGc/view), extract and put it in CVFinal/pretrained_models/FaceNet/
 
@@ -31,11 +34,11 @@ python3 Top.py
 	- Choose the your name on the list and click remove buttom.
 
 ## Result
-
-- Environment Setup  
+- Environment Setup
 ![Imgur](http://i.imgur.com/jeX7Obf.png)
-- Register identity face  
+- Register identity face
 ![Imgur](http://i.imgur.com/GyC0nBE.png)
+
 
 ## References
 - [Joint Face Detection and Alignment using Multi-task Cascaded Convolutional Networks][5] Paper
