@@ -11,7 +11,6 @@ In this project, we use [learning based model][6] to extract face features and t
 - [OpenCV][3] 
 
 ## Pretrained-Model
-- [FaceNet][4]
 
 Please download FaceNet pretrained model from [here](https://drive.google.com/file/d/0B5MzpY9kBtDVSTgxX25ZQzNTMGc/view), extract and put it in CVFinal/pretrained_models/FaceNet/
 
@@ -34,10 +33,9 @@ python3 Top.py
 ## Result
 
 - Environment Setup
-![Step_1](http://imgur.com/jeX7Obf)
+![Imgur](http://i.imgur.com/jeX7Obf.png)
 - Register identity face
-![Step_2](http://imgur.com/GyC0nBE)
-
+![Imgur](http://i.imgur.com/GyC0nBE.png)
 
 ## References
 - [Joint Face Detection and Alignment using Multi-task Cascaded Convolutional Networks][5] Paper
