@@ -32,9 +32,9 @@ python3 Top.py
 
 ## Result
 
-- Environment Setup
+- Environment Setup  
 ![Imgur](http://i.imgur.com/jeX7Obf.png)
-- Register identity face
+- Register identity face  
 ![Imgur](http://i.imgur.com/GyC0nBE.png)
 
 ## References
