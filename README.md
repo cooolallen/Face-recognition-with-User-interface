@@ -2,7 +2,7 @@
 
 In this project, we use [learning based model][6] to extract face features and to recognize who you are. Also, we create an elegant user interface in order to provide a good user experience. By interacting  with our UI, you can add/remove your face in our database.
 
-Block Diagram
+- Block Diagram
 ![Imgur](http://i.imgur.com/Urrf7Hh.png)
 
 
