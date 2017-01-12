@@ -30,7 +30,7 @@ python3 Top.py
 
 
 - <b>Remove identity face</b> :
-	- Choose the your name on the list and click remove buttom.
+	- Choose your name on the list and click remove buttom.
 
 ## Result
 - Environment Setup  
